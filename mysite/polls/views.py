@@ -1,8 +1,9 @@
 from multiprocessing import context
 from re import template
-from django.shortcuts import render
-from django.http import HttpResponse, JsonResponse
-from .models import Question
+from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
+from .models import Question, Choice
 from django.template import loader
 
 
@@ -18,11 +19,32 @@ def index(request):
 
 
 def detail(request, question_id):
-    return HttpResponse("You are looking at question %s. " % question_id)
+    try:
+        question = Question.objects.get(pk=question_id)
+    except:
+        raise Http404("Question does not exist")
+    context ={'question': question}
+    return render(request,'polls/detail.html', context)
 
 def results(request, question_id):
-    response = "you are looking at the results of question %s."
-    return HttpResponse(response % question_id)
+    try:
+        choice = get_object_or_404(Question, pk=question_id)
+    except:
+        raise Http404('question not found')
+    context ={'question': choice}
+    return render(request, 'polls/result.html', context)
 
 def vote(request, question_id):
-    return HttpResponse("You are voting on question %s. " % question_id)
+    question = get_object_or_404(Question, pk=question_id)
+    
+    try:
+        selected_choice = question.Choice_set.get(pk=request.POST['choice'])
+    except (KeyError, Choice.DoesNotExist):
+        return render(request, 'polls/detail.html', {
+            'question': question,
+            'error_message': "You didn't select a choice",
+        })
+    else:
+        selected_choice.votes += 1
+        selected_choice.save()
+        return HttpResponseRedirect(reverse('polls:results', args=(question.id)))
